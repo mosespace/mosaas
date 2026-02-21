@@ -1,20 +1,21 @@
-'use server';
+"use server";
 
-import { APIError } from 'better-auth';
-import { Resend } from 'resend';
+import { APIError } from "better-auth";
+import { Resend } from "resend";
 
-import ResetPasswordEmail from '@/components/emails/reset-password';
-import WelcomeEmail from '@/components/emails/welcome';
-import { auth } from '@/lib/auth/auth';
-import { siteConfig } from '@/lib/constants';
+import ResetPasswordEmail from "@/components/emails/reset-password";
+import WelcomeEmail from "@/components/emails/welcome";
+import { auth } from "@/lib/auth/auth";
+import { siteConfig } from "@/lib/constants";
 import type {
   ForgotPasswordFormValues,
   LoginFormValues,
   RegisterFormValues,
-} from '@/types/auth-user.schema';
+} from "@/types/auth-user.schema";
+import VerifyEmailOtp from "@/components/emails/verify-email";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const baseUrl = process.env.BETTER_AUTH_URL || '';
+const baseUrl = process.env.BETTER_AUTH_URL || "";
 
 export async function registerUser(data: RegisterFormValues, plan: string) {
   try {
@@ -48,13 +49,13 @@ export async function registerUser(data: RegisterFormValues, plan: string) {
       error: null,
     };
   } catch (error) {
-    console.error('❌ Signup error:', error);
+    console.error("❌ Signup error:", error);
     if (error instanceof APIError) {
-      if (error.status === 'UNPROCESSABLE_ENTITY') {
+      if (error.status === "UNPROCESSABLE_ENTITY") {
         const errorMsg =
-          error.message === 'Failed to create user'
-            ? 'Phone Number is Already Taken'
-            : 'Email is Already Taken';
+          error.message === "Failed to create user"
+            ? "Phone Number is Already Taken"
+            : "Email is Already Taken";
         return {
           success: false,
           data: null,
@@ -65,14 +66,14 @@ export async function registerUser(data: RegisterFormValues, plan: string) {
       return {
         success: false,
         data: null,
-        error: error.message || 'Authentication error occurred',
+        error: error.message || "Authentication error occurred",
         status: error.status,
       };
     }
     return {
       success: false,
       data: null,
-      error: 'Something went wrong',
+      error: "Something went wrong",
     };
   }
 }
@@ -93,16 +94,16 @@ export async function loginUser(data: LoginFormValues) {
     };
   } catch (error) {
     // Log the full error object to see what we're dealing with
-    console.error('[ERROR] ❌ Login error:', error);
-    console.error('[ERROR] Error type:', error?.constructor?.name);
-    console.error('[ERROR] Error keys:', Object.keys(error || {}));
+    console.error("[ERROR] ❌ Login error:", error);
+    console.error("[ERROR] Error type:", error?.constructor?.name);
+    console.error("[ERROR] Error keys:", Object.keys(error || {}));
     if (error instanceof APIError) {
-      console.log('[ERROR] 📛 APIError details:', {
-        message: error.message,
-        status: error.status,
-        body: (error as any).body,
-      });
-      if (error.status === 'UNAUTHORIZED') {
+      // console.log('[ERROR] 📛 APIError details:', {
+      //   message: error.message,
+      //   status: error.status,
+      //   body: (error as any).body,
+      // });
+      if (error.status === "UNAUTHORIZED") {
         return {
           success: false,
           data: null,
@@ -114,12 +115,12 @@ export async function loginUser(data: LoginFormValues) {
       return {
         success: false,
         data: null,
-        error: error.message || 'Authentication failed',
+        error: error.message || "Authentication failed",
         status: error.status,
       };
     }
     // Log non-APIError errors with more detail
-    console.info('[INFO] 🔍 Non-APIError caught:', {
+    console.info("[INFO] 🔍 Non-APIError caught:", {
       message: (error as any)?.message,
       stack: (error as any)?.stack,
       error: error,
@@ -127,7 +128,7 @@ export async function loginUser(data: LoginFormValues) {
     return {
       success: false,
       data: null,
-      error: (error as any)?.message || 'Something went wrong',
+      error: (error as any)?.message || "Something went wrong",
     };
   }
 }
@@ -145,12 +146,12 @@ export async function sendResetPasswordEmail(data: {
       react: ResetPasswordEmail({
         userEmail: data.to,
         resetLink: data.url,
-        expirationTime: '10 Mins',
+        expirationTime: "10 Mins",
       }),
     });
 
     if (error) {
-      console.log('ERROR', error);
+      // console.log('ERROR', error);
       return {
         success: false,
         error: error,
@@ -190,8 +191,8 @@ export async function sendForgotPasswordToken(
     };
   } catch (error) {
     if (error instanceof APIError) {
-      console.log(error.message, error.status);
-      if (error.status === 'UNAUTHORIZED') {
+      // console.log(error.message, error.status);
+      if (error.status === "UNAUTHORIZED") {
         return {
           success: false,
           data: null,
@@ -203,7 +204,7 @@ export async function sendForgotPasswordToken(
     return {
       success: false,
       data: null,
-      error: 'Something went wrong',
+      error: "Something went wrong",
     };
   }
 }
@@ -227,8 +228,8 @@ export async function resetPassword(formData: {
     };
   } catch (error) {
     if (error instanceof APIError) {
-      console.log(error.message, error.status);
-      if (error.status === 'UNAUTHORIZED') {
+      // console.log(error.message, error.status);
+      if (error.status === "UNAUTHORIZED") {
         return {
           success: false,
           data: null,
@@ -240,7 +241,46 @@ export async function resetPassword(formData: {
     return {
       success: false,
       data: null,
-      error: 'Something went wrong',
+      error: "Something went wrong",
+    };
+  }
+}
+
+export async function sendOtpEmail(data: {
+  email: string;
+  subject: string;
+  otp: string;
+}) {
+  try {
+    const { data: resData, error } = await resend.emails.send({
+      from: `${siteConfig.name} <info@${siteConfig.resend_domain}>`,
+      to: data.email,
+      subject: data.subject,
+      react: VerifyEmailOtp({
+        otp: data.otp,
+        email: data.email,
+      }),
+    });
+
+    if (error) {
+      // console.log('ERROR', error);
+      return {
+        success: false,
+        error: error,
+        data: null,
+      };
+    }
+
+    return {
+      success: false,
+      error: null,
+      data: resData,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error,
+      data: null,
     };
   }
 }
